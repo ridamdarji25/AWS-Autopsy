@@ -1,11 +1,11 @@
 output "ec2_public_ip" {
   description = "EC2 public IP — use this as EC2_IP in attack steps"
-  value       = aws_instance.autopsy_ec2.public_ip
+  value       = aws_instance.autopsy.public_ip
 }
 
 output "flask_app_url" {
   description = "Flask SSRF app URL"
-  value       = "http://${aws_instance.autopsy_ec2.public_ip}:5000"
+  value       = "http://${aws_instance.autopsy.public_ip}:5000"
 }
 
 output "sensitive_bucket_name" {
@@ -25,8 +25,8 @@ output "lab_summary" {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔪 AWS AUTOPSY | CASE #01 — LAB READY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-EC2 IP      : ${aws_instance.autopsy_ec2.public_ip}
-Flask URL   : http://${aws_instance.autopsy_ec2.public_ip}:5000
+EC2 IP      : ${aws_instance.autopsy.public_ip}
+Flask URL   : http://${aws_instance.autopsy.public_ip}:5000
 IAM Role    : ${aws_iam_role.autopsy_role.name}
 S3 Bucket   : ${aws_s3_bucket.sensitive.id}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
