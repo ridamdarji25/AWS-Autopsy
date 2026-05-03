@@ -1,2 +1,2 @@
-prefix     = "w1tn3sss"
+prefix     = "YOUR-NAME"
 aws_region = "us-east-1"
