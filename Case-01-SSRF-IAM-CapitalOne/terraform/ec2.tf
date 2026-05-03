@@ -83,7 +83,7 @@ h1 span{color:#f85149}
 .warn-text{color:#8b949e;font-size:11px;line-height:1.6}
 .dot{display:inline-block;width:6px;height:6px;background:#3fb950;
      border-radius:50%;margin-right:8px;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
   </style>
 </head>
 <body>
