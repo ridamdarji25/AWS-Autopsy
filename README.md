@@ -1,4 +1,8 @@
 # 🔪 The AWS Autopsy
+<br>
+<img width="1731" height="909" alt="AWS-Autopsy" src="https://github.com/user-attachments/assets/236d8684-d69f-4e63-8e81-9fb56622da0a" />
+
+<br>
 
 > Real AWS breaches. Dissected. Hands-on labs. Terraform included.
 
