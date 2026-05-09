@@ -34,11 +34,6 @@ resource "aws_s3_object" "public_file" {
   content_type = "text/plain"
 }
 
-# -------------------------------------------------------
-# SENSITIVE BUCKET (attacker CANNOT access at start)
-# Contains simulated PII and financial records
-# -------------------------------------------------------
-
 resource "aws_s3_bucket" "sensitive_bucket" {
   bucket        = "${var.prefix}-sensitive-bucket"
   force_destroy = true

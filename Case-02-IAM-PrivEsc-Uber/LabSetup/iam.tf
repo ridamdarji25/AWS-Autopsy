@@ -50,7 +50,7 @@ resource "aws_iam_policy" "attacker_policy" {
         Resource = "*"
       },
       {
-        Sid    = "DANGEROUS-AllowPolicyAttach"
+        Sid    = "DANGEROUSAllowPolicyAttach"
         Effect = "Allow"
         Action = [
           "iam:AttachUserPolicy"
@@ -58,7 +58,7 @@ resource "aws_iam_policy" "attacker_policy" {
         Resource = "*"
       },
       {
-        Sid    = "DANGEROUS-AllowPassRole"
+        Sid    = "DANGEROUSAllowPassRole"
         Effect = "Allow"
         Action = [
           "iam:PassRole"
