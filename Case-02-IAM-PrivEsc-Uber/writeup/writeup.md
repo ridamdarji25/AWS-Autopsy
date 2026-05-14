@@ -31,6 +31,10 @@ The author takes no responsibility for any misuse of the information presented i
 
 ---
 
+**NOTE : This lab isolates the IAM privilege escalation attack path (iam:AttachUserPolicy wildcard), a documented AWS attack vector relevant to the Uber breach. AWS access via PAM is publicly confirmed. Specific IAM configuration is not claimed.**
+
+---
+
 ## The Victim
 
 | Field | Details |
