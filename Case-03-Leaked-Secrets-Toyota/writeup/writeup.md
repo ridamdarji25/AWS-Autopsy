@@ -190,36 +190,32 @@ tconnect_bucket_name     = "yourname-tconnect-customer-data"
 
 ### Step 1 — "Find" the Key on GitHub
 
-In the real Toyota breach, the key was sitting inside the T-Connect source code on a public GitHub repository. Anyone browsing the repo — or any automated scanner — could read it directly from the file.
-
-Open `simulate_github_leak.py` in your lab folder. This is what the leaked file looked like:
+> 🎭 **This is simulated.** In the real Toyota breach, an actual AWS key was hardcoded inside T-Connect source code on a public GitHub repo. Here we recreate the same scenario for learning purposes, you don't need to hunt for credentials in any file. The **Access Key ID already appeared in your terminal** right after `terraform apply` as part of the outputs. For the Secret Access Key, run this — the `--raw` flag removes the surrounding quotes so you can copy it cleanly:
 
 ```python
 # HARDCODED CREDENTIALS - THIS IS THE VULNERABILITY
-AWS_ACCESS_KEY_ID     = "AKIAXXXXXXXXXXXXXXXX"
-AWS_SECRET_ACCESS_KEY = "XXXXXXXXXXXXXXXXXXXXXXXX"
+AWS_ACCESS_KEY_ID     = "AKIAXXXXXXXXXXXXXXXX"      # <- found in the public repo
+AWS_SECRET_ACCESS_KEY = "XXXXXXXXXXXXXXXXXXXXXXXX"   # <- sitting in plain text
 AWS_REGION            = "us-east-1"
 CUSTOMER_BUCKET       = "yourname-tconnect-customer-data"
 ```
 
-📸 **[SCREENSHOT 2 — simulate_github_leak.py open, hardcoded credentials visible]**
-
-Update the file with your actual keys from the Terraform outputs:
 
 ```bash
-terraform output leaked_access_key_id
 terraform output -raw leaked_secret_access_key
 ```
 
-Replace the placeholder values in `simulate_github_leak.py` with the real outputs.
+Copy both values. You'll use them in the next step.
 
 ---
 
+
+
+
+
 ### Step 2 — Configure the Leaked Profile
 
-> 🎭 **Lab Context:** Pretend you just found `simulate_github_leak.py` while browsing a public GitHub repository. The file has the AWS keys sitting right there in plain text — exactly as a real attacker (or scanner bot) would find them. You're now going to do what any attacker would do next: test if the key actually works.
-
-The credentials you'll use here come from your Terraform outputs — they represent the keys that were "hardcoded in the repo":
+> 🎭 **Mindset for this step:** You just found `simulate_github_leak.py` on a public GitHub repo. AWS keys are sitting in plain text inside the file. You copy them and do exactly what any attacker — or automated scanner bot — would do next: configure the keys locally and test if they actually work.
 
 ```bash
 aws configure --profile leaked
