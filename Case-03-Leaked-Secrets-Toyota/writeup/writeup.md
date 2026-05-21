@@ -5,7 +5,7 @@
 **Lab Time:** ~25 minutes
 **AWS Cost:** Near zero (IAM + S3 only — free tier eligible)
 
-**GitHub:** [AWS-Autopsy | Case #03](https://github.com/ridamdarji25/AWS-Autopsy)
+**GitHub:** [AWS-Autopsy | Case #03](https://github.com/ridamdarji25/AWS-Autopsy/tree/main/Case-03-Leaked-Secrets-Toyota)
 
 ---
 
@@ -24,6 +24,10 @@ This article and the accompanying lab are created strictly for educational and d
 ❌ Unauthorized access to computer systems is a criminal offense in most countries
 
 By continuing, you agree that you are using this content solely for ethical security research and education. The author takes no responsibility for any misuse of the information presented.
+
+<img width="1096" height="449" alt="image" src="https://github.com/user-attachments/assets/b1ac9d9f-5b10-4431-8a5c-b80dd4d9f7a0" />
+<br>
+</br>
 
 ---
 
@@ -154,13 +158,19 @@ This lab simulates the Toyota attack scenario end to end:
 git clone https://github.com/ridamdarji25/AWS-Autopsy
 cd AWS-Autopsy/Case-03-Secrets-GitHub-Toyota/LabSetup
 ```
+<img width="1024" height="275" alt="image" src="https://github.com/user-attachments/assets/8b809562-be74-42de-86a8-f8d90f333578" />
+<br>
+</br>
 
 **Verify terraform.tfvars:**
 
 ```hcl
-prefix = "yourname"
 region = "us-east-1"
+prefix = "yourname"
 ```
+<img width="981" height="224" alt="image" src="https://github.com/user-attachments/assets/587421de-a6b4-4e22-b344-f7526f4f8393" />
+<br>
+</br>
 
 **Deploy the lab:**
 
@@ -179,8 +189,9 @@ leaked_dev_user_name     = "yourname-leaked-dev-user"
 leaked_access_key_id     = "AKIAXXXXXXXXXXXXXXXXX"
 tconnect_bucket_name     = "yourname-tconnect-customer-data"
 ```
-
-📸 **[SCREENSHOT 1 — terraform apply complete, outputs visible]**
+<img width="748" height="132" alt="Screenshot 2026-05-21 082819" src="https://github.com/user-attachments/assets/4acaf9fe-09a4-4446-8a1f-bf09bbff4a9a" />
+<br>
+</br>
 
 ---
 
@@ -204,6 +215,9 @@ CUSTOMER_BUCKET       = "yourname-tconnect-customer-data"
 ```bash
 terraform output -raw leaked_secret_access_key
 ```
+<img width="929" height="131" alt="Screenshot 2026-05-21 082948" src="https://github.com/user-attachments/assets/b72b3e18-b2d2-4094-b6c2-85b294f1a1a0" />
+<br>
+</br>
 
 Copy both values. You'll use them in the next step.
 
@@ -223,7 +237,11 @@ aws configure --profile leaked
 # AWS Secret Access Key : (paste leaked_secret_access_key from terraform output -raw)
 # Default region name   : us-east-1
 # Default output format : json
+
 ```
+<img width="888" height="153" alt="Screenshot 2026-05-21 083848" src="https://github.com/user-attachments/assets/b5bff1a7-40f4-470a-b21a-da77c177cba0" />
+<br>
+</br>
 
 ---
 
@@ -245,7 +263,9 @@ Expected output:
 
 The key works. The attacker now has confirmed access.
 
-📸 **[SCREENSHOT 3 — get-caller-identity confirming key is valid]**
+<img width="954" height="185" alt="Screenshot 2026-05-21 084351" src="https://github.com/user-attachments/assets/08ed17e7-f1b4-4bd0-8f59-40b89d7e9851" />
+<br>
+</br>
 
 ---
 
@@ -266,7 +286,9 @@ Expected output:
 
 All customer data. Fully visible. One command.
 
-📸 **[SCREENSHOT 4 — s3 ls showing all customer data files]**
+<img width="996" height="158" alt="Screenshot 2026-05-21 084552" src="https://github.com/user-attachments/assets/467636ef-f9eb-47b4-8363-50c3e8c43650" />
+<br>
+</br>
 
 ---
 
@@ -285,7 +307,9 @@ download: s3://yourname-tconnect-customer-data/telemetry/vehicle-location-log.js
 download: s3://yourname-tconnect-customer-data/config/app-config.json
 ```
 
-📸 **[SCREENSHOT 5 — s3 sync complete, all files downloaded]**
+<img width="1228" height="258" alt="image" src="https://github.com/user-attachments/assets/00d0e54a-d3c2-41c1-88e4-1a84c4b2f32f" />
+<br>
+</br>
 
 View the stolen customer data:
 
@@ -306,37 +330,9 @@ TC-002,bob.tanaka@example.com,2018-03-15,JT3HP10V9X0234567
 cat stolen-toyota-data/customers/management-numbers.json
 ```
 
-📸 **[SCREENSHOT 6 — customer email data and management numbers visible]**
-
----
-
-### Step 6 — Run the Simulated Leaked Code
-
-```bash
-pip3 install boto3
-python3 simulate_github_leak.py
-```
-
-Expected output:
-
-```
-[*] Listing customer data files...
-    config/app-config.json
-    customers/email-list-2017-2022.csv
-    customers/management-numbers.json
-    telemetry/vehicle-location-log.json
-
-[*] Fetching customer email list...
-customer_id,email,registration_date,vehicle_vin
-TC-001,alice.yamamoto@example.com,2017-12-01...
-```
-
-📸 **[SCREENSHOT 7 — Python script running successfully using hardcoded credentials]**
-
-**Attack complete.**
-
-A key in a Python file. Five years on GitHub. 296,019 customers exposed.
-No malware. No exploits. Just a text file and the AWS CLI.
+<img width="933" height="319" alt="image" src="https://github.com/user-attachments/assets/530534e9-140e-46ad-9c68-c9d759b5db08" />
+<br>
+</br>
 
 ---
 
@@ -488,31 +484,14 @@ aws iam delete-access-key \
 
 ---
 
-### Fix 4 — Verify Remediation
-
-After rotating the key and removing it from code, confirm the old key no longer works:
-
-```bash
-aws sts get-caller-identity --profile leaked
-```
-
-Expected output:
-
-```
-An error occurred (InvalidClientTokenId) when calling
-the GetCallerIdentity operation: The security token
-included in the request is invalid.
-```
-
-📸 **[SCREENSHOT 8 — old key now invalid after rotation]**
-
----
-
 ## Cleanup
 
 ```bash
 terraform destroy
 ```
+<img width="1079" height="204" alt="image" src="https://github.com/user-attachments/assets/2754831e-5e01-4bbb-97c4-da62246bfaa1" />
+<br>
+</br>
 
 ---
 
