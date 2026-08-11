@@ -1,9 +1,3 @@
-# -------------------------------------------------------
-# S3 BUCKETS - Case 03
-# tconnect-customer-data : simulates Toyota T-Connect customer DB
-#                          accessible via the hardcoded key found on GitHub
-# -------------------------------------------------------
-
 resource "aws_s3_bucket" "tconnect_customer_data" {
   bucket        = "${var.prefix}-tconnect-customer-data"
   force_destroy = true
@@ -42,12 +36,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "tconnect_sse" {
     }
   }
 }
-
-# -------------------------------------------------------
-# SIMULATED CUSTOMER DATA
-# Mirrors what was exposed in the Toyota T-Connect breach
-# email addresses + customer management numbers
-# -------------------------------------------------------
 
 resource "aws_s3_object" "customer_emails" {
   bucket       = aws_s3_bucket.tconnect_customer_data.id

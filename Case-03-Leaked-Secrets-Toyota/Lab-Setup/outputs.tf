@@ -1,7 +1,3 @@
-# -------------------------------------------------------
-# OUTPUTS - Case 03
-# -------------------------------------------------------
-
 output "leaked_dev_user_name" {
   description = "IAM username of the developer whose key was leaked on GitHub"
   value       = aws_iam_user.leaked_dev.name

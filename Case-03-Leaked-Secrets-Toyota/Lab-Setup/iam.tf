@@ -1,14 +1,3 @@
-# -------------------------------------------------------
-# CASE 03 - Secrets Leaked on GitHub (Toyota 2022)
-# -------------------------------------------------------
-# This file creates:
-#   - leaked-dev-user   : simulates a developer whose access key
-#                         was hardcoded in public GitHub source code
-#   - leaked access key : the "hardcoded" key found in the repo
-#   - minimal policy    : read-only on the specific bucket only
-#                         but attacker can still exfiltrate all data
-# -------------------------------------------------------
-
 resource "aws_iam_user" "leaked_dev" {
   name = "${var.prefix}-leaked-dev-user"
   path = "/"
@@ -24,12 +13,6 @@ resource "aws_iam_user" "leaked_dev" {
 resource "aws_iam_access_key" "leaked_dev" {
   user = aws_iam_user.leaked_dev.name
 }
-
-# -------------------------------------------------------
-# POLICY - Simulates what a developer service account has
-# Read access to the customer data bucket
-# This is the key that was hardcoded in the GitHub repo
-# -------------------------------------------------------
 
 resource "aws_iam_policy" "leaked_dev_policy" {
   name        = "${var.prefix}-leaked-dev-policy"
